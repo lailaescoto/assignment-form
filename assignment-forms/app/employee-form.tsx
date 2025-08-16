@@ -1,10 +1,15 @@
-import React from 'react';
-import { View, TextInput, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, TextInput, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { MaterialIcons } from '@expo/vector-icons';
+import { api } from './api';
 
 export default function EmployeeInfo() {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const employeeSchema = Yup.object().shape({
     fullName: Yup.string().required('Full name is required'),
     username: Yup.string()
@@ -30,9 +35,18 @@ export default function EmployeeInfo() {
           address: '',
         }}
         validationSchema={employeeSchema}
-        onSubmit={(values) => {
-          console.log('Employee Info Submitted:', values);
-          alert('Employee info submitted successfully!');
+        onSubmit={async (values) => {
+          setSubmitting(true);
+          setSubmitSuccess(null);
+          setSubmitError(null);
+          try {
+            await api.createEmployee(values);
+            setSubmitSuccess('Employee info submitted successfully!');
+          } catch (e: any) {
+            setSubmitError(e.message || 'Submission failed');
+          } finally {
+            setSubmitting(false);
+          }
         }}
       >
         {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
@@ -121,13 +135,21 @@ export default function EmployeeInfo() {
             </View>
             {touched.address && errors.address && <Text style={styles.error}>{errors.address}</Text>}
 
+            {submitSuccess && <Text style={styles.success}>{submitSuccess}</Text>}
+            {submitError && <Text style={styles.error}>{submitError}</Text>}
+
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, submitting && { opacity: 0.6 }]}
               onPress={() => handleSubmit()}
               activeOpacity={0.8}
+              disabled={submitting}
             >
-              <MaterialIcons name="save" size={24} color="#fff" />
-              <Text style={styles.buttonText}>Submit</Text>
+              {submitting ? (
+                <ActivityIndicator color="#fff" style={{ marginRight: 12 }} />
+              ) : (
+                <MaterialIcons name="save" size={24} color="#fff" />
+              )}
+              <Text style={styles.buttonText}>{submitting ? 'Submitting...' : 'Submit'}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -174,6 +196,12 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 10,
     marginLeft: 4,
+  },
+  success: {
+    color: 'green',
+    marginBottom: 10,
+    marginLeft: 4,
+    fontWeight: 'bold',
   },
   button: {
     flexDirection: 'row',

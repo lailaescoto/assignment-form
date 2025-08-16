@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { api, setToken } from './api';
 
 export default function SignIn() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const signInSchema = Yup.object().shape({
     email: Yup.string().email('Invalid email').required('Email is required'),
@@ -17,9 +20,21 @@ export default function SignIn() {
     <Formik
       initialValues={{ email: '', password: '' }}
       validationSchema={signInSchema}
-      onSubmit={(values) => {
-        console.log('Sign in values:', values);
-        router.push('/employee-form');
+      onSubmit={async (values) => {
+        setApiError(null);
+        setLoading(true);
+        try {
+          const { token } = await api.signin({
+            email: values.email,
+            password: values.password,
+          });
+          setToken(token);
+          router.push('/employee-form');
+        } catch (e: any) {
+          setApiError(e.message);
+        } finally {
+          setLoading(false);
+        }
       }}
     >
       {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
@@ -56,14 +71,16 @@ export default function SignIn() {
           {touched.password && errors.password && (
             <Text style={styles.error}>{errors.password}</Text>
           )}
+          {apiError && <Text style={styles.apiError}>{apiError}</Text>}
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, loading && { opacity: 0.6 }]}
             onPress={() => handleSubmit()}
             activeOpacity={0.8}
+            disabled={loading}
           >
             <MaterialIcons name="login" size={24} color="#fff" />
-            <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.buttonText}>{loading ? 'Signing In...' : 'Sign In'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -98,6 +115,12 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 10,
     marginLeft: 4,
+  },
+  apiError: {
+    color: 'red',
+    marginBottom: 10,
+    marginLeft: 4,
+    fontWeight: 'bold',
   },
   button: {
     flexDirection: 'row',

@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { api, setToken } from './api';
 
 export default function SignUp() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const signUpSchema = Yup.object().shape({
     fullName: Yup.string().required('Full name is required'),
@@ -21,9 +24,22 @@ export default function SignUp() {
     <Formik
       initialValues={{ fullName: '', email: '', password: '', confirmPassword: '' }}
       validationSchema={signUpSchema}
-      onSubmit={(values) => {
-        console.log('Sign up:', values);
-        router.push('/employee-form');
+      onSubmit={async (values) => {
+        setApiError(null);
+        setLoading(true);
+        try {
+          const { token } = await api.signup({
+            fullName: values.fullName,
+            email: values.email,
+            password: values.password,
+          });
+          setToken(token);
+          router.push('/employee-form');
+        } catch (e: any) {
+          setApiError(e.message);
+        } finally {
+          setLoading(false);
+        }
       }}
     >
       {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
@@ -91,14 +107,16 @@ export default function SignUp() {
           {touched.confirmPassword && errors.confirmPassword && (
             <Text style={styles.error}>{errors.confirmPassword}</Text>
           )}
+          {apiError && <Text style={styles.apiError}>{apiError}</Text>}
 
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, loading && { opacity: 0.6 }]}
             onPress={() => handleSubmit()}
             activeOpacity={0.8}
+            disabled={loading}
           >
             <MaterialIcons name="person-add" size={24} color="#fff" />
-            <Text style={styles.buttonText}>Sign Up</Text>
+            <Text style={styles.buttonText}>{loading ? 'Signing Up...' : 'Sign Up'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -133,6 +151,12 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 10,
     marginLeft: 4,
+  },
+  apiError: {
+    color: 'red',
+    marginBottom: 10,
+    marginLeft: 4,
+    fontWeight: 'bold',
   },
   button: {
     flexDirection: 'row',
